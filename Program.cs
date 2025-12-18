@@ -1,29 +1,34 @@
+
+
 using Microsoft.AspNetCore.Http.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Needed for Flow JSON size
+// Configure JSON options (needed for Flow JSON size)
 builder.Services.Configure<JsonOptions>(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = null;
 });
 
+// Add controllers (required for any API controllers)
+builder.Services.AddControllers();
+
 var app = builder.Build();
 
-/**
- * HEALTH CHECK
- * Meta calls this first
- */
-app.MapGet("/", () =>
-{
-    return Results.Ok(new { status = "ok" });
-});
+// Bind to the port from environment variable (Render requires this)
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
+app.Urls.Add($"http://*:{port}");
 
-app.MapGet("/healthz", () => Results.Ok("Healthy")); // <-- simple health check
-/**
- * FLOW ENDPOINT
- * Meta sends submitted flow data here
- */
+// Map controllers (for API controllers)
+app.MapControllers();
+
+// Simple health check endpoint
+app.MapGet("/healthz", () => Results.Ok("Healthy"));
+
+// Root endpoint (optional)
+app.MapGet("/", () => Results.Ok(new { status = "ok" }));
+
+// Flow POST endpoint
 app.MapPost("/flow", async (HttpRequest request) =>
 {
     using var reader = new StreamReader(request.Body);
@@ -32,17 +37,13 @@ app.MapPost("/flow", async (HttpRequest request) =>
     Console.WriteLine("FLOW DATA RECEIVED:");
     Console.WriteLine(body);
 
-    // REQUIRED RESPONSE
+    // Required response
     return Results.Ok(new
     {
         status = "success"
     });
 });
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
-app.Urls.Add($"http://*:{port}");
-
-app.MapControllers(); // <-- make sure your API endpoints are mapped
 app.Run();
 
 
