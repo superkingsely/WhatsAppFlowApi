@@ -43,34 +43,36 @@ app.MapGet("/debug/env", () =>
 
 app.MapPost("/flows/endpoint", async (FlowEncryptedRequest req) =>
 {
-    // Load private key from environment variable. If the raw PEM is not set,
-    // support a base64-encoded PEM in `PRIVATE_KEY_PEM_B64` (useful for env UIs)
-    var privateKeyPem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM");
-    if (string.IsNullOrEmpty(privateKeyPem))
+    try
     {
-        var privateKeyPemB64 = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM_B64");
-        if (!string.IsNullOrEmpty(privateKeyPemB64))
+        // Load private key from environment variable. If the raw PEM is not set,
+        // support a base64-encoded PEM in `PRIVATE_KEY_PEM_B64` (useful for env UIs)
+        var privateKeyPem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM");
+        if (string.IsNullOrEmpty(privateKeyPem))
         {
-            try
+            var privateKeyPemB64 = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM_B64");
+            if (!string.IsNullOrEmpty(privateKeyPemB64))
             {
-                privateKeyPem = Encoding.UTF8.GetString(Convert.FromBase64String(privateKeyPemB64));
-            }
-            catch
-            {
-                return Results.BadRequest(new { error = "PRIVATE_KEY_PEM_B64 invalid base64" });
+                try
+                {
+                    privateKeyPem = Encoding.UTF8.GetString(Convert.FromBase64String(privateKeyPemB64));
+                }
+                catch
+                {
+                    return Results.BadRequest(new { error = "PRIVATE_KEY_PEM_B64 invalid base64" });
+                }
             }
         }
-    }
 
-    if (string.IsNullOrEmpty(privateKeyPem))
-    {
-        return Results.BadRequest(new { error = "PRIVATE_KEY_PEM environment variable not set" });
-    }
+        if (string.IsNullOrEmpty(privateKeyPem))
+        {
+            return Results.BadRequest(new { error = "PRIVATE_KEY_PEM environment variable not set" });
+        }
 
-    var rsa = FlowEncryptStatic.LoadRsaFromPem(privateKeyPem);
+        var rsa = FlowEncryptStatic.LoadRsaFromPem(privateKeyPem);
 
-    // 1) decrypt
-    var decryptedJson = FlowEncryptStatic.DecryptFlowRequest(req, rsa, out var aesKey, out var iv);
+        // 1) decrypt
+        var decryptedJson = FlowEncryptStatic.DecryptFlowRequest(req, rsa, out var aesKey, out var iv);
 
     using var doc = JsonDocument.Parse(decryptedJson);
     var action = doc.RootElement.GetProperty("action").GetString();
@@ -89,8 +91,14 @@ app.MapPost("/flows/endpoint", async (FlowEncryptedRequest req) =>
     }
 
     // For now, just return “active” on other actions too (to pass health check quickly)
-    var fallback = FlowEncryptStatic.EncryptFlowResponse(new { version = "3.0", data = new { status = "active" } }, aesKey, iv);
-    return Results.Text(fallback, "application/json");
+        var fallback = FlowEncryptStatic.EncryptFlowResponse(new { version = "3.0", data = new { status = "active" } }, aesKey, iv);
+        return Results.Text(fallback, "application/json");
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"Error in /flows/endpoint: {ex}");
+        return Results.StatusCode(500);
+    }
 });
 
 
