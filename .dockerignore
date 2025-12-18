@@ -1,0 +1,25 @@
+
+
+# Ignore build output
+bin/
+obj/
+out/
+
+# Ignore user-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Ignore local environment files
+.env
+.vscode/
+.idea/
+
+# Ignore npm/node files if you have them
+node_modules/
+npm-debug.log
+
+# Ignore Dockerfile artifacts
+*.log
+*.tmp

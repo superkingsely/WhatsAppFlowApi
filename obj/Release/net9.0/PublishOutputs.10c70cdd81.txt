@@ -1,0 +1,10 @@
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\out\WhatsAppFlowApi.exe
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\out\nuget.config
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\out\appsettings.Development.json
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\out\appsettings.json
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\out\WhatsAppFlowApi.dll
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\out\WhatsAppFlowApi.deps.json
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\out\WhatsAppFlowApi.runtimeconfig.json
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\out\WhatsAppFlowApi.pdb
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\out\Microsoft.AspNetCore.OpenApi.dll
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\out\Microsoft.OpenApi.dll
