@@ -28,21 +28,82 @@ app.MapGet("/healthz", () => Results.Ok("Healthy"));
 // Root endpoint (optional)
 app.MapGet("/", () => Results.Ok(new { status = "ok" }));
 
-// Flow POST endpoint
-app.MapPost("/flow", async (HttpRequest request) =>
+
+// Load private key once (store in env/secret manager in real deployments)
+var privateKeyPem = File.ReadAllText("private_key.pem");
+var rsa = LoadRsaFromPem(privateKeyPem);
+
+app.MapPost("/flows/endpoint", async (FlowEncryptedRequest req) =>
 {
-    using var reader = new StreamReader(request.Body);
-    var body = await reader.ReadToEndAsync();
+    // 1) decrypt
+    var decryptedJson = DecryptFlowRequest(req, rsa, out var aesKey, out var iv);
 
-    Console.WriteLine("FLOW DATA RECEIVED:");
-    Console.WriteLine(body);
+    using var doc = JsonDocument.Parse(decryptedJson);
+    var action = doc.RootElement.GetProperty("action").GetString();
 
-    // Required response
-    return Results.Ok(new
+    // 2) handle ping
+    if (action == "ping") // action can be init/back/data_exchange/ping :contentReference[oaicite:5]{index=5}
     {
-        status = "success"
-    });
+        var responseObj = new
+        {
+            version = "3.0",
+            data = new { status = "active" }
+        };
+
+        var encryptedResponse = EncryptFlowResponse(responseObj, aesKey, iv);
+        return Results.Text(encryptedResponse, "application/json");
+    }
+
+    // For now, just return “active” on other actions too (to pass health check quickly)
+    var fallback = EncryptFlowResponse(new { version = "3.0", data = new { status = "active" } }, aesKey, iv);
+    return Results.Text(fallback, "application/json");
 });
+
+
+// app.MapPost("/flow", async (HttpRequest request) =>
+// {
+//     using var reader = new StreamReader(request.Body);
+//     var body = await reader.ReadToEndAsync();
+
+//     var json = System.Text.Json.JsonDocument.Parse(body);
+
+//     // 1️⃣ Handle verification challenge
+//     if (json.RootElement.TryGetProperty("challenge", out var challenge))
+//     {
+//         return Results.Ok(new
+//         {
+//             challenge = challenge.GetString()
+//         });
+//     }
+
+//     // 2️⃣ Handle real flow submission later
+//     Console.WriteLine("FLOW DATA:");
+//     Console.WriteLine(body);
+
+//     return Results.Ok(new
+//     {
+//         status = "success"
+//     });
+// });
+
+
+
+// Flow POST endpoint
+// app.MapPost("/flow", async (HttpRequest request) =>
+// {
+//     using var reader = new StreamReader(request.Body);
+//     var body = await reader.ReadToEndAsync();
+
+//     Console.WriteLine("FLOW DATA RECEIVED:");
+//     Console.WriteLine(body);
+
+//     // Required response
+//     return Results.Ok(new
+//     {
+//         status = "success"
+//     });
+// });
+
 
 app.Run();
 
