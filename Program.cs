@@ -31,12 +31,17 @@ app.MapGet("/healthz", () => Results.Ok("Healthy"));
 app.MapGet("/", () => Results.Ok(new { status = "ok" }));
 
 
-// Load private key once (store in env/secret manager in real deployments)
-var privateKeyPem = File.ReadAllText("private_key.pem");
-var rsa = FlowEncryptStatic.LoadRsaFromPem(privateKeyPem);
-
 app.MapPost("/flows/endpoint", async (FlowEncryptedRequest req) =>
 {
+    // Load private key from environment variable
+    var privateKeyPem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM");
+    if (string.IsNullOrEmpty(privateKeyPem))
+    {
+        return Results.BadRequest(new { error = "PRIVATE_KEY_PEM environment variable not set" });
+    }
+
+    var rsa = FlowEncryptStatic.LoadRsaFromPem(privateKeyPem);
+
     // 1) decrypt
     var decryptedJson = FlowEncryptStatic.DecryptFlowRequest(req, rsa, out var aesKey, out var iv);
 
