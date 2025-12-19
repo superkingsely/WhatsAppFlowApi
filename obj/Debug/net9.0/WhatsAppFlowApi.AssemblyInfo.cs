@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WhatsAppFlowApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+42a696ca511075ea43dba303021a8b8f7dcf6eda")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f325b212927e4c735f34a92766b650048fb035b3")]
 [assembly: System.Reflection.AssemblyProductAttribute("WhatsAppFlowApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WhatsAppFlowApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
