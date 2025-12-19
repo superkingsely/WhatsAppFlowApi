@@ -35,20 +35,16 @@ public static string DecryptFlowRequest(FlowEncryptedRequest req, RSA rsa, out b
 
     var enc = Convert.FromBase64String(req.encrypted_flow_data);
 
-    // last 16 bytes = GCM tag
-    byte[] tag = enc[^16..];
-    byte[] cipherText = enc[..^16];
-
-    // Use BouncyCastle GCM which supports 16-byte nonces (WhatsApp standard)
+    // BouncyCastle GCM expects full encrypted data (ciphertext || tag) and validates tag internally
     var cipher = new GcmBlockCipher(new AesEngine());
     var param = new AeadParameters(new KeyParameter(aesKey), 128, iv);
     cipher.Init(false, param);
     
-    byte[] plain = new byte[cipherText.Length];
-    int len = cipher.ProcessBytes(cipherText, 0, cipherText.Length, plain, 0);
+    byte[] plain = new byte[cipher.GetOutputSize(enc.Length)];
+    int len = cipher.ProcessBytes(enc, 0, enc.Length, plain, 0);
     cipher.DoFinal(plain, len);
 
-    return Encoding.UTF8.GetString(plain);
+    return Encoding.UTF8.GetString(plain, 0, len);
 }
 
 public static string EncryptFlowResponse(object responseObj, byte[] aesKey, byte[] requestIv)
