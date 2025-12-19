@@ -42,9 +42,10 @@ public static string DecryptFlowRequest(FlowEncryptedRequest req, RSA rsa, out b
     
     byte[] plain = new byte[cipher.GetOutputSize(enc.Length)];
     int len = cipher.ProcessBytes(enc, 0, enc.Length, plain, 0);
-    cipher.DoFinal(plain, len);
-
-    return Encoding.UTF8.GetString(plain, 0, len);
+    int finalLen = cipher.DoFinal(plain, len);
+    
+    // Combine lengths: ProcessBytes wrote 'len' bytes, DoFinal wrote 'finalLen' more bytes
+    return Encoding.UTF8.GetString(plain, 0, len + finalLen);
 }
 
 public static string EncryptFlowResponse(object responseObj, byte[] aesKey, byte[] requestIv)
