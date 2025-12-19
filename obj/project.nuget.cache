@@ -1,21 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "Vy7iKEphpxY=",
+  "dgSpecHash": "Es4YttjzIKM=",
   "success": true,
   "projectFilePath": "C:\\Users\\USER\\Desktop\\my-work\\WhatsAppFlowApi\\WhatsAppFlowApi.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\USER\\.nuget\\packages\\bouncycastle.cryptography\\2.3.1\\bouncycastle.cryptography.2.3.1.nupkg.sha512",
     "C:\\Users\\USER\\.nuget\\packages\\microsoft.aspnetcore.openapi\\9.0.9\\microsoft.aspnetcore.openapi.9.0.9.nupkg.sha512",
     "C:\\Users\\USER\\.nuget\\packages\\microsoft.openapi\\1.6.17\\microsoft.openapi.1.6.17.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1900",
-      "level": "Warning",
-      "message": "Error occurred while getting package vulnerability data: Unable to load the service index for source https://api.nuget.org/v3/index.json.",
-      "projectPath": "C:\\Users\\USER\\Desktop\\my-work\\WhatsAppFlowApi\\WhatsAppFlowApi.csproj",
-      "warningLevel": 1,
-      "filePath": "C:\\Users\\USER\\Desktop\\my-work\\WhatsAppFlowApi\\WhatsAppFlowApi.csproj",
-      "targetGraphs": []
-    }
-  ]
+  "logs": []
 }

@@ -39,3 +39,4 @@ C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\bin\Debug\net9.0\out\appsettings.j
 C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\bin\Debug\net9.0\out\WhatsAppFlowApi.deps.json
 C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\bin\Debug\net9.0\out\WhatsAppFlowApi.runtimeconfig.json
 C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\bin\Debug\net9.0\out\WhatsAppFlowApi.staticwebassets.endpoints.json
+C:\Users\USER\Desktop\my-work\WhatsAppFlowApi\bin\Debug\net9.0\BouncyCastle.Cryptography.dll
