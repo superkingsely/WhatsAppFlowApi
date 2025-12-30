@@ -29,6 +29,7 @@ public static RSA LoadRsaFromPem(string privateKeyPem)
 public static string DecryptFlowRequest(FlowEncryptedRequest req, RSA rsa, out byte[] aesKey, out byte[] iv)
 {
     iv = Convert.FromBase64String(req.initial_vector);
+    iv = FlipIv(iv);
 
     var encAesKey = Convert.FromBase64String(req.encrypted_aes_key);
     aesKey = rsa.Decrypt(encAesKey, RSAEncryptionPadding.OaepSHA256);

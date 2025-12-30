@@ -35,6 +35,7 @@ using Microsoft.AspNetCore.Http.Json;
 using System.Security.Cryptography;
 using System.IO;
 using System.Linq;
+using System.Net.Http.Headers;
 using WhatsAppFlowApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -60,6 +61,43 @@ app.MapGet("/debug/env", () =>
 	var hasPem = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM"));
 	var hasB64 = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM_B64"));
 	return Results.Ok(new { keyPresent = hasPem || hasB64, hasPem, hasB64 });
+});
+
+// Endpoint to get the public key for uploading to WhatsApp
+app.MapGet("/public_key", () => Results.Text(GetPublicKey(), "text/plain"));
+
+// Endpoint to upload the public key to WhatsApp (requires WHATSAPP_ACCESS_TOKEN env var)
+app.MapPost("/upload_public_key", async (IHttpClientFactory httpClientFactory) =>
+{
+	var token = Environment.GetEnvironmentVariable("WHATSAPP_ACCESS_TOKEN");
+	if (string.IsNullOrEmpty(token))
+		return Results.BadRequest(new { error = "WHATSAPP_ACCESS_TOKEN environment variable not set" });
+
+	var publicKey = GetPublicKey();
+	var phoneId = "834043419801889"; // from learn.txt
+
+	var url = $"https://graph.facebook.com/v22.0/{phoneId}/whatsapp_business_encryption";
+	var payload = new { business_public_key = publicKey.Replace("\n", "\\n").Replace("\r", "") };
+
+	try
+	{
+		var client = httpClientFactory.CreateClient();
+		var request = new HttpRequestMessage(HttpMethod.Post, url);
+		request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+		request.Content = JsonContent.Create(payload);
+
+		var response = await client.SendAsync(request);
+		var responseBody = await response.Content.ReadAsStringAsync();
+
+		if (response.IsSuccessStatusCode)
+			return Results.Ok(new { status = "success", response = responseBody });
+		else
+			return Results.BadRequest(new { error = "Upload failed", statusCode = (int)response.StatusCode, response = responseBody });
+	}
+	catch (Exception ex)
+	{
+		return Results.Json(new { error = ex.Message }, statusCode: 500);
+	}
 });
 
 //// Returns dummy areas or proxies to an external API if AREAS_API_URL is set
@@ -174,6 +212,19 @@ static string GetPrivateKey()
 	File.WriteAllText("public_key.pem", publicPem);
 
 	return pemKey;
+}
+
+static string GetPublicKey()
+{
+	var file = "public_key.pem";
+	if (File.Exists(file))
+	{
+		return File.ReadAllText(file);
+	}
+
+	// generate if not exists
+	GetPrivateKey();
+	return File.ReadAllText(file);
 }
 
 app.Run();
