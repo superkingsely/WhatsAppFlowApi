@@ -33,6 +33,72 @@ app.MapGet("/debug/env", () =>
     return Results.Ok(new { hasPem, hasB64 });
 });
 
+// upload pub key
+app.MapPost("/upload_public_key", async (IHttpClientFactory httpClientFactory) =>
+{
+    Console.WriteLine("🚀 /upload_public_key HIT");
+
+    var token = Environment.GetEnvironmentVariable("WHATSAPP_ACCESS_TOKEN");
+    var phoneId = Environment.GetEnvironmentVariable("WHATSAPP_PHONE_NUMBER_ID");
+
+    if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(phoneId))
+    {
+        Console.Error.WriteLine("❌ Missing token or phone ID");
+        return Results.BadRequest("Missing WHATSAPP_ACCESS_TOKEN or PHONE_NUMBER_ID");
+    }
+
+    // Load private key
+    var privateKeyPem = GetPrivateKey();
+    if (string.IsNullOrEmpty(privateKeyPem))
+    {
+        Console.Error.WriteLine("❌ PRIVATE KEY NOT FOUND");
+        return Results.StatusCode(500);
+    }
+
+    // Derive public key from private key
+    using var rsa = RSA.Create();
+    rsa.ImportFromPem(privateKeyPem);
+
+    var publicKeyPem = rsa.ExportRSAPublicKeyPem();
+
+    Console.WriteLine($"🔑 Public key length: {publicKeyPem.Length}");
+    Console.WriteLine("🔑 Public key preview:");
+    Console.WriteLine(publicKeyPem[..Math.Min(120, publicKeyPem.Length)] + "...");
+
+    var payload = new
+    {
+        business_public_key = publicKeyPem
+    };
+
+    Console.WriteLine("📤 Payload being sent:");
+    Console.WriteLine(JsonSerializer.Serialize(payload));
+
+    var url =
+        $"https://graph.facebook.com/v22.0/{phoneId}/whatsapp_business_encryption";
+
+    var client = httpClientFactory.CreateClient();
+    var request = new HttpRequestMessage(HttpMethod.Post, url)
+    {
+        Content = JsonContent.Create(payload)
+    };
+
+    request.Headers.Authorization =
+        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+    var response = await client.SendAsync(request);
+    var body = await response.Content.ReadAsStringAsync();
+
+    Console.WriteLine($"📥 Meta Status: {(int)response.StatusCode}");
+    Console.WriteLine("📥 Meta Response:");
+    Console.WriteLine(body);
+
+    if (!response.IsSuccessStatusCode)
+        return Results.BadRequest(body);
+
+    return Results.Ok(new { success = true, response = body });
+});
+
+
 
 // =======================================================
 // 🔹 FLOW ENCRYPTED ENDPOINT
