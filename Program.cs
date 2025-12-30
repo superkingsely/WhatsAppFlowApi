@@ -59,7 +59,8 @@ app.MapPost("/upload_public_key", async (IHttpClientFactory httpClientFactory) =
     using var rsa = RSA.Create();
     rsa.ImportFromPem(privateKeyPem);
 
-    var publicKeyPem = rsa.ExportRSAPublicKeyPem();
+    // var publicKeyPem = rsa.ExportRSAPublicKeyPem();
+    var publicKeyPem = rsa.ExportSubjectPublicKeyInfoPem();
 
     Console.WriteLine($"🔑 Public key length: {publicKeyPem.Length}");
     Console.WriteLine("🔑 Public key preview:");
