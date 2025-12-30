@@ -106,14 +106,26 @@ app.MapPost("/flows/endpoint", async (FlowEncryptedRequest req, IHttpClientFacto
 		{
 			var areas = await FetchAreasAsync(httpClientFactory);
 
+			// Log fetched areas
+			Console.WriteLine("Fetched areas: " + JsonSerializer.Serialize(areas));
+
+			// Format response expected by WhatsApp Flow: must include `response.screen`
 			var responseObj = new
 			{
-				version = "3.0",
-				data = new
+				response = new
 				{
-					delivery_areas = areas.Select(a => new { id = a.Id, title = a.Title, fee = a.Fee })
+					screen = new
+					{
+						version = "3.0",
+						data = new
+						{
+							delivery_areas = areas.Select(a => new { id = a.Id, title = a.Title, fee = a.Fee })
+						}
+					}
 				}
 			};
+
+			Console.WriteLine("Formatted response: " + JsonSerializer.Serialize(responseObj));
 
 			var encrypted = FlowEncryptStatic.EncryptFlowResponse(responseObj, aesKey, iv);
 			return Results.Text(encrypted, "application/json");
@@ -122,12 +134,38 @@ app.MapPost("/flows/endpoint", async (FlowEncryptedRequest req, IHttpClientFacto
 		// ping fallback
 		if (action == "ping")
 		{
-			var responseObj = new { version = "3.0", data = new { status = "active" } };
+			var responseObj = new
+			{
+				response = new
+				{
+					screen = new
+					{
+						version = "3.0",
+						data = new { status = "active" }
+					}
+				}
+			};
+
+			Console.WriteLine("Formatted response: " + JsonSerializer.Serialize(responseObj));
+
 			var encrypted = FlowEncryptStatic.EncryptFlowResponse(responseObj, aesKey, iv);
 			return Results.Text(encrypted, "application/json");
 		}
 
-		var fallbackObj = new { version = "3.0", data = new { status = "active" } };
+		var fallbackObj = new
+		{
+			response = new
+			{
+				screen = new
+				{
+					version = "3.0",
+					data = new { status = "active" }
+				}
+			}
+		};
+
+		Console.WriteLine("Formatted response: " + JsonSerializer.Serialize(fallbackObj));
+
 		var fallback = FlowEncryptStatic.EncryptFlowResponse(fallbackObj, aesKey, iv);
 		return Results.Text(fallback, "application/json");
 	}
