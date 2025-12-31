@@ -106,76 +106,50 @@ app.MapPost("/upload_public_key", async (IHttpClientFactory httpClientFactory) =
 // =======================================================
 
 
-app.MapPost("/flows/endpoint", async (HttpContext context) =>
+app.MapPost("/flows/endpoint", (FlowEncryptedRequest req) =>
 {
-    Console.WriteLine("🚀 /flows/endpoint HIT");
+    Console.WriteLine("🚀 FLOW HEALTH CHECK HIT");
 
-    // //1️⃣ Load private key from env
-    var privatePem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM")
-        ?? throw new Exception("PRIVATE_KEY_PEM missing");
-
-    // 2️⃣ Derive public key from PRIVATE key
-    using var rsa = RSA.Create();
-    rsa.ImportFromPem(privatePem);
-
-    var derivedPublicKey = rsa.ExportSubjectPublicKeyInfoPem();
-    Console.WriteLine("🔑 Derived public key:");
-    Console.WriteLine(derivedPublicKey);
-
-    // 3️⃣ Fetch WhatsApp registered public key
-    var phoneNumberId = Environment.GetEnvironmentVariable("WHATSAPP_PHONE_NUMBER_ID");
-    var token = Environment.GetEnvironmentVariable("WHATSAPP_ACCESS_TOKEN");
-
-    var client = new HttpClient();
-    client.DefaultRequestHeaders.Authorization =
-        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-
-    var url =
-        $"https://graph.facebook.com/v24.0/{phoneNumberId}/whatsapp_business_encryption";
-
-    var response = await client.GetAsync(url);
-    var body = await response.Content.ReadAsStringAsync();
-
-    if (!response.IsSuccessStatusCode)
+    try
     {
-        Console.WriteLine("❌ Failed to fetch WhatsApp public key:");
-        Console.WriteLine(body);
-        return Results.Problem("Failed to verify WhatsApp public key");
+        var privatePem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM")
+            ?? throw new Exception("PRIVATE_KEY_PEM missing");
+
+        using var rsa = RSA.Create();
+        rsa.ImportFromPem(privatePem);
+
+        // 🔓 Decrypt
+        var decryptedJson = FlowEncryptStatic.DecryptFlowRequest(
+            req, rsa, out var aesKey, out var iv);
+
+        Console.WriteLine("🔓 Decrypted payload:");
+        Console.WriteLine(decryptedJson);
+
+        // ✅ Health check response
+        var response = new
+        {
+            version = "3.0",
+            response = new
+            {
+                screen = "INIT",
+                data = new { status = "active" }
+            }
+        };
+
+        // 🔐 Encrypt response
+        var encrypted = FlowEncryptStatic.EncryptFlowResponse(
+            response, aesKey, iv);
+
+        Console.WriteLine("✅ FLOW HEALTH OK");
+
+        return Results.Text(encrypted, "application/json");
     }
-
-    using var json = JsonDocument.Parse(body);
-    var whatsappPublicKey =
-        json.RootElement.GetProperty("business_public_key").GetString();
-
-    // 4️⃣ Normalize both keys
-    string Normalize(string pem) =>
-        pem.Replace("-----BEGIN PUBLIC KEY-----", "")
-           .Replace("-----END PUBLIC KEY-----", "")
-           .Replace("\n", "")
-           .Replace("\r", "")
-           .Trim();
-
-    var derivedNorm = Normalize(derivedPublicKey);
-    var whatsappNorm = Normalize(whatsappPublicKey!);
-
-    // 5️⃣ Compare fingerprints
-    bool match = derivedNorm == whatsappNorm;
-
-    Console.WriteLine(match
-        ? "✅ PRIVATE KEY MATCHES WHATSAPP PUBLIC KEY"
-        : "❌ PRIVATE KEY DOES NOT MATCH WHATSAPP PUBLIC KEY");
-
-    // 6️⃣ Fail fast if mismatch
-    if (!match)
-        return Results.Problem("Private key does NOT match WhatsApp public key");
-
-
-    // Health check OK
-    return Results.Ok(new
+    catch (Exception ex)
     {
-        success = true,
-        key_match = true
-    });
+        Console.Error.WriteLine("🔥 FLOW HEALTH ERROR");
+        Console.Error.WriteLine(ex.ToString());
+        return Results.StatusCode(500);
+    }
 });
 
 
