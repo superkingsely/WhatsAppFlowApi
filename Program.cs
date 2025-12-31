@@ -75,7 +75,7 @@ app.MapPost("/upload_public_key", async (IHttpClientFactory httpClientFactory) =
     Console.WriteLine(JsonSerializer.Serialize(payload));
 
     var url =
-        $"https://graph.facebook.com/v22.0/{phoneId}/whatsapp_business_encryption";
+        $"https://graph.facebook.com/v24.0/{phoneId}/whatsapp_business_encryption";
 
     var client = httpClientFactory.CreateClient();
     var request = new HttpRequestMessage(HttpMethod.Post, url)
@@ -105,131 +105,61 @@ app.MapPost("/upload_public_key", async (IHttpClientFactory httpClientFactory) =
 // 🔹 FLOW ENCRYPTED ENDPOINT
 // =======================================================
 
-app.MapPost("/flows/endpoint", async (
-    FlowEncryptedRequest req,
-    IHttpClientFactory httpClientFactory) =>
+app.MapPost("/flows/endpoint", (
+    FlowEncryptedRequest req) =>
 {
     try
     {
-        Console.WriteLine("🚀 /flows/endpoint HIT");
+        Console.WriteLine("🚀 FLOW HEALTH CHECK HIT");
 
-        // -----------------------------
-        // Load private key
-        // -----------------------------
+        // 1️⃣ Load private key
         var privateKeyPem = GetPrivateKey();
         if (string.IsNullOrEmpty(privateKeyPem))
         {
-            Console.Error.WriteLine("❌ PRIVATE_KEY_PEM missing");
+            Console.Error.WriteLine("❌ PRIVATE KEY MISSING");
             return Results.StatusCode(500);
         }
 
-        var rsa = FlowEncryptStatic.LoadRsaFromPem(privateKeyPem);
+        using var rsa = RSA.Create();
+        rsa.ImportFromPem(privateKeyPem);
 
-        // -----------------------------
-        // Decrypt request
-        // -----------------------------
+        // 2️⃣ Decrypt request
         var decryptedJson = FlowEncryptStatic.DecryptFlowRequest(
             req, rsa, out var aesKey, out var iv);
 
-        Console.WriteLine("🔓 DECRYPTED REQUEST:");
+        Console.WriteLine("🔓 DECRYPTED PAYLOAD:");
         Console.WriteLine(decryptedJson);
 
-        using var doc = JsonDocument.Parse(decryptedJson);
-        var root = doc.RootElement;
-
-        var action = root.TryGetProperty("action", out var act)
-            ? act.GetString()
-            : "unknown";
-
-        Console.WriteLine($"👉 ACTION = {action}");
-
-        // -----------------------------
-        // Handle ping
-        // -----------------------------
-        if (action == "ping")
-        {
-            var pingResponse = new
-            {
-                version = "3.0",
-                response = new
-                {
-                    screen = "INIT",
-                    data = new { status = "active" }
-                }
-            };
-
-            Console.WriteLine("📤 RESPONSE (ping):");
-            Console.WriteLine(JsonSerializer.Serialize(pingResponse));
-
-            var encrypted = FlowEncryptStatic.EncryptFlowResponse(
-                pingResponse, aesKey, iv);
-
-            return Results.Text(encrypted, "application/json");
-        }
-
-        // -----------------------------
-        // Handle get_areas
-        // -----------------------------
-        if (action == "get_areas")
-        {
-            var areas = await FetchAreasAsync(httpClientFactory);
-
-            Console.WriteLine("📦 FETCHED AREAS:");
-            Console.WriteLine(JsonSerializer.Serialize(areas));
-
-            var responseObj = new
-            {
-                version = "3.0",
-                response = new
-                {
-                    screen = "ADDRESS",
-                    data = new
-                    {
-                        delivery_areas = areas.Select(a => new
-                        {
-                            id = a.Id,
-                            title = a.Title
-                        })
-                    }
-                }
-            };
-
-            Console.WriteLine("📤 RESPONSE (areas):");
-            Console.WriteLine(JsonSerializer.Serialize(responseObj));
-
-            var encrypted = FlowEncryptStatic.EncryptFlowResponse(
-                responseObj, aesKey, iv);
-
-            return Results.Text(encrypted, "application/json");
-        }
-
-        // -----------------------------
-        // Fallback
-        // -----------------------------
-        Console.WriteLine("⚠️ Unknown action, returning fallback");
-
-        var fallback = new
+        // 3️⃣ FORCE PING RESPONSE (health check only)
+        var responseObj = new
         {
             version = "3.0",
             response = new
             {
                 screen = "INIT",
-                data = new { status = "active" }
+                data = new { }
             }
         };
 
-        var fallbackEncrypted = FlowEncryptStatic.EncryptFlowResponse(
-            fallback, aesKey, iv);
+        Console.WriteLine("📤 HEALTH RESPONSE:");
+        Console.WriteLine(JsonSerializer.Serialize(responseObj));
 
-        return Results.Text(fallbackEncrypted, "application/json");
+        // 4️⃣ Encrypt response
+        var encrypted = FlowEncryptStatic.EncryptFlowResponse(
+            responseObj, aesKey, iv);
+
+        return Results.Text(encrypted, "application/json");
     }
     catch (Exception ex)
     {
-        Console.Error.WriteLine("🔥 FLOW ERROR");
-        Console.Error.WriteLine(ex.ToString());
+        Console.Error.WriteLine("🔥 FLOW HEALTH ERROR");
+        Console.Error.WriteLine(ex);
         return Results.StatusCode(500);
     }
 });
+
+
+
 
 app.Run();
 
