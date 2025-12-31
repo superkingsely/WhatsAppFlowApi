@@ -105,58 +105,175 @@ app.MapPost("/upload_public_key", async (IHttpClientFactory httpClientFactory) =
 // 🔹 FLOW ENCRYPTED ENDPOINT
 // =======================================================
 
-app.MapPost("/flows/endpoint", (
-    FlowEncryptedRequest req) =>
+app.MapPost("/flows/endpoint", async (
+    FlowEncryptedRequest req,
+    IHttpClientFactory httpClientFactory) =>
 {
     try
     {
-        Console.WriteLine("🚀 FLOW HEALTH CHECK HIT");
+        Console.WriteLine("🚀 /flows/endpoint HIT");
 
-        // 1️⃣ Load private key
+        // -----------------------------
+        // Load private key from env
+        // -----------------------------
         var privateKeyPem = GetPrivateKey();
         if (string.IsNullOrEmpty(privateKeyPem))
         {
-            Console.Error.WriteLine("❌ PRIVATE KEY MISSING");
+            Console.Error.WriteLine("❌ PRIVATE_KEY_PEM missing");
             return Results.StatusCode(500);
         }
 
         using var rsa = RSA.Create();
         rsa.ImportFromPem(privateKeyPem);
 
-        // 2️⃣ Decrypt request
+        // Derive public key from private key
+        var derivedPublicKeyPem = rsa.ExportSubjectPublicKeyInfoPem();
+        Console.WriteLine("🔑 Derived public key:");
+        Console.WriteLine(derivedPublicKeyPem[..Math.Min(120, derivedPublicKeyPem.Length)] + "...");
+
+        // -----------------------------
+        // Verify that private key matches WhatsApp public key
+        // -----------------------------
+        var token = Environment.GetEnvironmentVariable("WHATSAPP_ACCESS_TOKEN");
+        var phoneId = Environment.GetEnvironmentVariable("WHATSAPP_PHONE_NUMBER_ID");
+
+        if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(phoneId))
+        {
+            Console.Error.WriteLine("❌ Missing WHATSAPP_ACCESS_TOKEN or PHONE_NUMBER_ID");
+            return Results.StatusCode(500);
+        }
+
+        var client = httpClientFactory.CreateClient();
+        var url = $"https://graph.facebook.com/v24.0/{phoneId}/whatsapp_business_encryption?fields=business_public_key";
+
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.Error.WriteLine("❌ Failed to fetch WhatsApp public key:");
+            Console.Error.WriteLine(body);
+            return Results.StatusCode(500);
+        }
+
+        using var doc = JsonDocument.Parse(body);
+        var remotePubKey = doc.RootElement
+                             .GetProperty("business_public_key")
+                             .GetString();
+
+        if (string.IsNullOrEmpty(remotePubKey))
+        {
+            Console.Error.WriteLine("❌ WhatsApp public key is empty");
+            return Results.StatusCode(500);
+        }
+
+        if (!remotePubKey.Trim().Equals(derivedPublicKeyPem.Trim()))
+        {
+            Console.Error.WriteLine("❌ Private key does not match WhatsApp public key!");
+            return Results.StatusCode(500);
+        }
+
+        Console.WriteLine("✅ Private key matches WhatsApp public key");
+
+        // -----------------------------
+        // Decrypt request
+        // -----------------------------
         var decryptedJson = FlowEncryptStatic.DecryptFlowRequest(
             req, rsa, out var aesKey, out var iv);
 
-        Console.WriteLine("🔓 DECRYPTED PAYLOAD:");
+        Console.WriteLine("🔓 DECRYPTED REQUEST:");
         Console.WriteLine(decryptedJson);
 
-        // 3️⃣ FORCE PING RESPONSE (health check only)
-        var responseObj = new
+        using var reqDoc = JsonDocument.Parse(decryptedJson);
+        var root = reqDoc.RootElement;
+
+        var action = root.TryGetProperty("action", out var act)
+            ? act.GetString()
+            : "unknown";
+
+        Console.WriteLine($"👉 ACTION = {action}");
+
+        // -----------------------------
+        // Handle ping
+        // -----------------------------
+        if (action == "ping")
+        {
+            var pingResponse = new
+            {
+                version = "3.0",
+                response = new
+                {
+                    screen = "INIT",
+                    data = new { status = "active" }
+                }
+            };
+
+            var encrypted = FlowEncryptStatic.EncryptFlowResponse(
+                pingResponse, aesKey, iv);
+
+            return Results.Text(encrypted, "application/json");
+        }
+
+        // -----------------------------
+        // Handle get_areas
+        // -----------------------------
+        if (action == "get_areas")
+        {
+            var areas = await FetchAreasAsync(httpClientFactory);
+
+            var responseObj = new
+            {
+                version = "3.0",
+                response = new
+                {
+                    screen = "ADDRESS",
+                    data = new
+                    {
+                        delivery_areas = areas.Select(a => new
+                        {
+                            id = a.Id,
+                            title = a.Title
+                        })
+                    }
+                }
+            };
+
+            var encrypted = FlowEncryptStatic.EncryptFlowResponse(
+                responseObj, aesKey, iv);
+
+            return Results.Text(encrypted, "application/json");
+        }
+
+        // -----------------------------
+        // Fallback
+        // -----------------------------
+        var fallback = new
         {
             version = "3.0",
             response = new
             {
                 screen = "INIT",
-                data = new { }
+                data = new { status = "active" }
             }
         };
 
-        Console.WriteLine("📤 HEALTH RESPONSE:");
-        Console.WriteLine(JsonSerializer.Serialize(responseObj));
+        var fallbackEncrypted = FlowEncryptStatic.EncryptFlowResponse(
+            fallback, aesKey, iv);
 
-        // 4️⃣ Encrypt response
-        var encrypted = FlowEncryptStatic.EncryptFlowResponse(
-            responseObj, aesKey, iv);
-
-        return Results.Text(encrypted, "application/json");
+        return Results.Text(fallbackEncrypted, "application/json");
     }
     catch (Exception ex)
     {
-        Console.Error.WriteLine("🔥FLOW HEALTH ERROR");
-        Console.Error.WriteLine(ex);
+        Console.Error.WriteLine("🔥 FLOW HEALTH ERROR");
+        Console.Error.WriteLine(ex.ToString());
         return Results.StatusCode(500);
     }
 });
+
 
 
 
