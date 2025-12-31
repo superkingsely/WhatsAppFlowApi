@@ -152,7 +152,7 @@ app.MapPost("/flows/endpoint", (
     }
     catch (Exception ex)
     {
-        Console.Error.WriteLine("🔥 FLOW HEALTH ERROR");
+        Console.Error.WriteLine("🔥FLOW HEALTH ERROR");
         Console.Error.WriteLine(ex);
         return Results.StatusCode(500);
     }
