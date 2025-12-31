@@ -31,7 +31,7 @@ namespace WhatsAppFlowApi
             var app = builder.Build();
 
             // ==========================
-            // 🔹 BASIC HEALTH & DEBUG
+            // 🔹 BASIC HEALTH &  DEBUG
             // ==========================
             app.MapGet("/", () => Results.Ok(new { status = "ok", service = "whatsapp-flow-api" }));
             app.MapGet("/healthz", () => Results.Ok("healthy"));
