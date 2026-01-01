@@ -158,26 +158,57 @@ namespace WhatsAppFlowApi
         }
 
         // Decrypt WhatsApp flow request correctly
-        private static string DecryptFlowRequest(FlowEncryptedRequest req, RSA rsa, out byte[] aesKey, out byte[] iv)
-        {
-            iv = Convert.FromBase64String(req.initial_vector);
-            iv = FlipIv(iv);
 
-            var encAesKey = Convert.FromBase64String(req.encrypted_aes_key);
-            aesKey = rsa.Decrypt(encAesKey, RSAEncryptionPadding.OaepSHA256);
 
-            var encData = Convert.FromBase64String(req.encrypted_flow_data);
+private static string DecryptFlowRequest(
+    FlowEncryptedRequest req,
+    RSA rsa,
+    out byte[] aesKey,
+    out byte[] requestIv)
+{
+    requestIv = Convert.FromBase64String(req.initial_vector); // ✅ keep as-is
 
-            var cipher = new GcmBlockCipher(new AesEngine());
-            var param = new AeadParameters(new KeyParameter(aesKey), 128, iv);
-            cipher.Init(false, param);
+    var encAesKey = Convert.FromBase64String(req.encrypted_aes_key);
+    aesKey = rsa.Decrypt(encAesKey, RSAEncryptionPadding.OaepSHA256);
 
-            byte[] plain = new byte[cipher.GetOutputSize(encData.Length)];
-            int len = cipher.ProcessBytes(encData, 0, encData.Length, plain, 0);
-            int finalLen = cipher.DoFinal(plain, len);
+    var encData = Convert.FromBase64String(req.encrypted_flow_data); // usually ciphertext||tag
 
-            return Encoding.UTF8.GetString(plain, 0, len + finalLen);
-        }
+    var cipher = new GcmBlockCipher(new AesEngine());
+    var param = new AeadParameters(new KeyParameter(aesKey), 128, requestIv);
+    cipher.Init(false, param);
+
+    byte[] plain = new byte[cipher.GetOutputSize(encData.Length)];
+    int len = cipher.ProcessBytes(encData, 0, encData.Length, plain, 0);
+    len += cipher.DoFinal(plain, len);
+
+    return Encoding.UTF8.GetString(plain, 0, len);
+}
+
+
+
+
+
+
+        // private static string DecryptFlowRequest(FlowEncryptedRequest req, RSA rsa, out byte[] aesKey, out byte[] iv)
+        // {
+        //     iv = Convert.FromBase64String(req.initial_vector);
+        //     iv = FlipIv(iv);
+
+        //     var encAesKey = Convert.FromBase64String(req.encrypted_aes_key);
+        //     aesKey = rsa.Decrypt(encAesKey, RSAEncryptionPadding.OaepSHA256);
+
+        //     var encData = Convert.FromBase64String(req.encrypted_flow_data);
+
+        //     var cipher = new GcmBlockCipher(new AesEngine());
+        //     var param = new AeadParameters(new KeyParameter(aesKey), 128, iv);
+        //     cipher.Init(false, param);
+
+        //     byte[] plain = new byte[cipher.GetOutputSize(encData.Length)];
+        //     int len = cipher.ProcessBytes(encData, 0, encData.Length, plain, 0);
+        //     int finalLen = cipher.DoFinal(plain, len);
+
+        //     return Encoding.UTF8.GetString(plain, 0, len + finalLen);
+        // }
 
         // Encrypt WhatsApp flow response correctly
         private static string EncryptFlowResponse(object responseObj, byte[] aesKey, byte[] requestIv)
