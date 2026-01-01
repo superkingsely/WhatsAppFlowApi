@@ -103,10 +103,9 @@ namespace WhatsAppFlowApi
                     var response = new
                     {
                         version = "3.0",
-                        response = new
+                        data = new
                         {
-                            screen = "INIT",
-                            data = new { status = "active" }
+                           status = "active"
                         }
                     };
 
