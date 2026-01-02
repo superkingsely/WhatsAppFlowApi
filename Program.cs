@@ -89,6 +89,7 @@ namespace WhatsAppFlowApi
                     var response = new
                     {
                         version = "3.0",
+                        screen="screen_asnlyt",
                         data = new
                         {
                             delivery_areas = deliveryAreas
