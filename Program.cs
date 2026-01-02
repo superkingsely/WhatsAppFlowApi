@@ -74,8 +74,14 @@ namespace WhatsAppFlowApi
                     var deliveryAreas = rawAreas!.ConvertAll(a => new
                     {
                         id = a.id,
-                        title = a.name   // 👈 change ONLY if API field name differs
+                        title = a.title   // 👈 change ONLY if API field name differs
                     });
+
+                    Console.WriteLine("🧪 MAPPED DELIVERY AREAS:");
+                    Console.WriteLine(JsonSerializer.Serialize(deliveryAreas, new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    }));
 
                     // ==========================
                     // 🔹 FLOW RESPONSE (CORRECT FORMAT)
@@ -124,10 +130,11 @@ namespace WhatsAppFlowApi
             string initial_vector
         );
 
-        public sealed record ExternalArea(
-            string id,
-            string name
-        );
+       public sealed class ExternalArea
+        {
+            public string id { get; set; } = default!;
+            public string title { get; set; } = default!;
+        }
 
         // ==========================
         // 🔹 CRYPTO HELPERS
