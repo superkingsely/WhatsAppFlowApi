@@ -41,208 +41,210 @@ namespace WhatsAppFlowApi
             // ==========================
 
 
-                    app.MapPost("/flows/endpoint", async (
-    FlowEncryptedRequest req,
-    IHttpClientFactory httpClientFactory
-) =>
-{
-    Console.WriteLine("🚀 FLOW HIT");
+//                     app.MapPost("/flows/endpoint", async (
+//     FlowEncryptedRequest req,
+//     IHttpClientFactory httpClientFactory
+// ) =>
+// {
+//     Console.WriteLine("🚀 FLOW HIT");
 
-    try
-    {
-        var privatePem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM")
-            ?? throw new Exception("PRIVATE_KEY_PEM missing");
+//     try
+//     {
+//         var privatePem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM")
+//             ?? throw new Exception("PRIVATE_KEY_PEM missing");
 
-        using var rsa = RSA.Create();
-        rsa.ImportFromPem(privatePem);
+//         using var rsa = RSA.Create();
+//         rsa.ImportFromPem(privatePem);
 
-        // 🔓 Decrypt request (USING YOUR EXISTING HELPER)
-        var decryptedJson = DecryptFlowRequest(req, rsa, out var aesKey, out var iv);
+//         // 🔓 Decrypt request (USING YOUR EXISTING HELPER)
+//         var decryptedJson = DecryptFlowRequest(req, rsa, out var aesKey, out var iv);
 
-        Console.WriteLine("🔓 Decrypted Payload:");
-        Console.WriteLine(decryptedJson);
+//         Console.WriteLine("🔓 Decrypted Payload:");
+//         Console.WriteLine(decryptedJson);
 
-        using var doc = JsonDocument.Parse(decryptedJson);
-        var root = doc.RootElement;
+//         using var doc = JsonDocument.Parse(decryptedJson);
+//         var root = doc.RootElement;
 
-        var version = root.GetProperty("version").GetString();
+//         var version = root.GetProperty("version").GetString();
 
-        var action = root.TryGetProperty("action", out var act)
-            ? act.GetString()
-            : null;
+//         var action = root.TryGetProperty("action", out var act)
+//             ? act.GetString()
+//             : null;
 
-        // ==================================================
-        // ✅ 1. HEALTH CHECK (PING) — MUST RETURN MINIMAL JSON
-        // ==================================================
+//         // ==================================================
+//         // ✅ 1. HEALTH CHECK (PING) — MUST RETURN MINIMAL JSON
+//         // ==================================================
 
-            if (action == "ping")
-{
-    Console.WriteLine("🟢 Health check (ping) handled");
+//             if (action == "ping")
+// {
+//     Console.WriteLine("🟢 Health check (ping) handled");
 
-    var pingResponse = new
-    {
-        version = version,
-        data = new { }
-    };
+//     var pingResponse = new
+//     {
+//         version = version,
+//         data = new { }
+//     };
 
-    Console.WriteLine("📦 PING RESPONSE (before encryption):");
-    Console.WriteLine(JsonSerializer.Serialize(pingResponse, new JsonSerializerOptions
-    {
-        WriteIndented = true
-    }));
+//     Console.WriteLine("📦 PING RESPONSE (before encryption):");
+//     Console.WriteLine(JsonSerializer.Serialize(pingResponse, new JsonSerializerOptions
+//     {
+//         WriteIndented = true
+//     }));
 
-    // ✅ MUST BE ENCRYPTED & BASE64
-    var encryptedPing = EncryptFlowResponse(pingResponse, aesKey, iv);
+//     // ✅ MUST BE ENCRYPTED & BASE64
+//     var encryptedPing = EncryptFlowResponse(pingResponse, aesKey, iv);
 
-    return Results.Text(encryptedPing, "application/json");
-}
+//     return Results.Text(encryptedPing, "application/json");
+// }
 
         
 
-        // ==================================================
-        // ✅ 2. NORMAL FLOW LOGIC (UNCHANGED)
-        // ==================================================
+//         // ==================================================
+//         // ✅ 2. NORMAL FLOW LOGIC (UNCHANGED)
+//         // ==================================================
 
-        var client = httpClientFactory.CreateClient();
-        var apiResponse = await client.GetAsync("https://cjendpoint.onrender.com/api/areas");
+//         var client = httpClientFactory.CreateClient();
+//         var apiResponse = await client.GetAsync("https://cjendpoint.onrender.com/api/areas");
 
-        if (!apiResponse.IsSuccessStatusCode)
-            throw new Exception("Failed to fetch delivery areas");
+//         if (!apiResponse.IsSuccessStatusCode)
+//             throw new Exception("Failed to fetch delivery areas");
 
-        var rawAreas = await apiResponse.Content
-            .ReadFromJsonAsync<List<ExternalArea>>();
+//         var rawAreas = await apiResponse.Content
+//             .ReadFromJsonAsync<List<ExternalArea>>();
 
-        var deliveryAreas = rawAreas!.ConvertAll(a => new
-        {
-            id = a.id,
-            title = a.title
-        });
+//         var deliveryAreas = rawAreas!.ConvertAll(a => new
+//         {
+//             id = a.id,
+//             title = a.title
+//         });
 
-        Console.WriteLine("🧪 MAPPED DELIVERY AREAS:");
-        Console.WriteLine(JsonSerializer.Serialize(deliveryAreas, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        }));
+//         Console.WriteLine("🧪 MAPPED DELIVERY AREAS:");
+//         Console.WriteLine(JsonSerializer.Serialize(deliveryAreas, new JsonSerializerOptions
+//         {
+//             WriteIndented = true
+//         }));
 
-        var response = new
-        {
-            version = "3.0",
-            screen = "screen_asnlyt",
-            data = new
+//         var response = new
+//         {
+//             version = "3.0",
+//             screen = "screen_asnlyt",
+//             data = new
+//             {
+//                 delivery_areas = deliveryAreas
+//             }
+//         };
+
+//         Console.WriteLine("📦 FLOW JSON SENT TO WHATSAPP (before encryption):");
+//         Console.WriteLine(JsonSerializer.Serialize(response, new JsonSerializerOptions
+//         {
+//             WriteIndented = true
+//         }));
+
+//         var encrypted = EncryptFlowResponse(response, aesKey, iv);
+
+//         Console.WriteLine("✅ FLOW RESPONSE OK");
+//         return Results.Text(encrypted, "application/json");
+//     }
+//     catch (Exception ex)
+//     {
+//         Console.Error.WriteLine("🔥 FLOW ERROR");
+//         Console.Error.WriteLine(ex);
+//         return Results.StatusCode(500);
+//     }
+// });
+
+
+            app.MapPost("/flows/endpoint", async (
+                FlowEncryptedRequest req,
+                IHttpClientFactory httpClientFactory
+            ) =>
             {
-                delivery_areas = deliveryAreas
-            }
-        };
+                Console.WriteLine("🚀 FLOW HIT");
 
-        Console.WriteLine("📦 FLOW JSON SENT TO WHATSAPP (before encryption):");
-        Console.WriteLine(JsonSerializer.Serialize(response, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        }));
+                try
+                {
+                    var privatePem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM")
+                        ?? throw new Exception("PRIVATE_KEY_PEM missing");
 
-        var encrypted = EncryptFlowResponse(response, aesKey, iv);
+                    using var rsa = RSA.Create();
+                    rsa.ImportFromPem(privatePem);
 
-        Console.WriteLine("✅ FLOW RESPONSE OK");
-        return Results.Text(encrypted, "application/json");
-    }
-    catch (Exception ex)
-    {
-        Console.Error.WriteLine("🔥 FLOW ERROR");
-        Console.Error.WriteLine(ex);
-        return Results.StatusCode(500);
-    }
-});
+                    // 🔓 Decrypt request
+                    var decryptedJson = DecryptFlowRequest(req, rsa, out var aesKey, out var iv);
+                    Console.WriteLine("🔓 Decrypted Payload:");
+                    // Console.WriteLine(decryptedJson);
 
+                    // ==========================
+                    // 🔹 FETCH EXTERNAL API DATA
+                    // ==========================
+                    var client = httpClientFactory.CreateClient();
+                    var apiResponse = await client.GetAsync("https://cjendpoint.onrender.com/api/areas");
 
-            // app.MapPost("/flows/endpoint", async (
-            //     FlowEncryptedRequest req,
-            //     IHttpClientFactory httpClientFactory
-            // ) =>
-            // {
-            //     Console.WriteLine("🚀 FLOW HIT");
+                    if (!apiResponse.IsSuccessStatusCode)
+                        throw new Exception("Failed to fetch delivery areas");
 
-            //     try
-            //     {
-            //         var privatePem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM")
-            //             ?? throw new Exception("PRIVATE_KEY_PEM missing");
+                    var rawAreas = await apiResponse.Content.ReadFromJsonAsync<List<ExternalArea>>();
 
-            //         using var rsa = RSA.Create();
-            //         rsa.ImportFromPem(privatePem);
+                    // Map to WhatsApp-required format
+                    var deliveryAreas = rawAreas!.ConvertAll(a => new
+                    {
+                        id = a.id,
+                        title = a.title   // 👈 change ONLY if API field name differs
+                    });
 
-            //         // 🔓 Decrypt request
-            //         var decryptedJson = DecryptFlowRequest(req, rsa, out var aesKey, out var iv);
-            //         Console.WriteLine("🔓 Decrypted Payload:");
-            //         // Console.WriteLine(decryptedJson);
-
-            //         // ==========================
-            //         // 🔹 FETCH EXTERNAL API DATA
-            //         // ==========================
-            //         var client = httpClientFactory.CreateClient();
-            //         var apiResponse = await client.GetAsync("https://cjendpoint.onrender.com/api/areas");
-
-            //         if (!apiResponse.IsSuccessStatusCode)
-            //             throw new Exception("Failed to fetch delivery areas");
-
-            //         var rawAreas = await apiResponse.Content.ReadFromJsonAsync<List<ExternalArea>>();
-
-            //         // Map to WhatsApp-required format
-            //         var deliveryAreas = rawAreas!.ConvertAll(a => new
-            //         {
-            //             id = a.id,
-            //             title = a.title   // 👈 change ONLY if API field name differs
-            //         });
-
-            //         Console.WriteLine("🧪 MAPPED DELIVERY AREAS:");
-            //         Console.WriteLine(JsonSerializer.Serialize(deliveryAreas, new JsonSerializerOptions
-            //         {
-            //             WriteIndented = true
-            //         }));
+                    Console.WriteLine("🧪 MAPPED DELIVERY AREAS:");
+                    Console.WriteLine(JsonSerializer.Serialize(deliveryAreas, new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    }));
 
 
 
 
 
-            //         // ==========================
-            //         // 🔹 FLOW RESPONSE (CORRECT FORMAT)
-            //         // ==========================
-            //         var response = new
-            //         {
-            //             version = "3.0",
-            //             screen="screen_asnlyt",
-            //             data = new
-            //             {
-            //                 delivery_areas = deliveryAreas
-            //             }
-            //         };
+                    // ==========================
+                    // 🔹 FLOW RESPONSE (CORRECT FORMAT)
+                    // ==========================
+                    var response = new
+                    {
+                        version = "3.0",
+                        screen="screen_asnlyt",
+                        data = new
+                        {
+                            delivery_areas = deliveryAreas
+                        }
+                    };
 
-            //         // 🔍 LOG EXACT FLOW JSON (WHAT WHATSAPP SEES)
-            //         var flowJson = JsonSerializer.Serialize(
-            //             response,
-            //             new JsonSerializerOptions { WriteIndented = true }
-            //         );
+                    // 🔍 LOG EXACT FLOW JSON (WHAT WHATSAPP SEES)
+                    var flowJson = JsonSerializer.Serialize(
+                        response,
+                        new JsonSerializerOptions { WriteIndented = true }
+                    );
 
-            //         Console.WriteLine("📦 FLOW JSON SENT TO WHATSAPP (before encryption):");
-            //         Console.WriteLine(flowJson);
-
-
+                    Console.WriteLine("📦 FLOW JSON SENT TO WHATSAPP (before encryption):");
+                    Console.WriteLine(flowJson);
 
 
-            //         // 🔐 Encrypt response
-            //         var encrypted = EncryptFlowResponse(response, aesKey, iv);
 
-            //         Console.WriteLine("✅ FLOW RESPONSE OK");
-            //         return Results.Text(encrypted, "application/json");
-            //     }
-            //     catch (Exception ex)
-            //     {
-            //         Console.Error.WriteLine("🔥 FLOW ERROR");
-            //         Console.Error.WriteLine(ex);
-            //         return Results.StatusCode(500);
-            //     }
-            // });
+
+                    // 🔐 Encrypt response
+                    var encrypted = EncryptFlowResponse(response, aesKey, iv);
+
+                    Console.WriteLine("✅ FLOW RESPONSE OK");
+                    return Results.Text(encrypted, "application/json");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("🔥 FLOW ERROR");
+                    Console.Error.WriteLine(ex);
+                    return Results.StatusCode(500);
+                }
+            });
 
             app.Run();
         }
+
+        
 
         // ==========================
         // 🔹 DTOs
