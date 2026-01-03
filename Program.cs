@@ -211,7 +211,8 @@ namespace WhatsAppFlowApi
                         screen="screen_asnlyt",
                         data = new
                         {
-                            delivery_areas = deliveryAreas
+                            delivery_areas = deliveryAreas,
+                            status = "active"
                         }
                     };
 
@@ -244,7 +245,7 @@ namespace WhatsAppFlowApi
             app.Run();
         }
 
-        
+
 
         // ==========================
         // 🔹 DTOs
