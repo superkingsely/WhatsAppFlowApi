@@ -39,8 +39,7 @@ namespace WhatsAppFlowApi
             // ==========================
             // 🔹 FLOW ENDPOINT
             // ==========================
-
-            app.MapPost("/flows/endpoint", async (
+                app.MapPost("/flows/endpoint", async (
     FlowEncryptedRequest req,
     IHttpClientFactory httpClientFactory
 ) =>
@@ -50,7 +49,7 @@ namespace WhatsAppFlowApi
     try
     {
         // ==========================
-        // 🔐 LOAD PRIVATE KEY
+        // 🔐 Load RSA private key
         // ==========================
         var privatePem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM")
             ?? throw new Exception("PRIVATE_KEY_PEM missing");
@@ -59,47 +58,59 @@ namespace WhatsAppFlowApi
         rsa.ImportFromPem(privatePem);
 
         // ==========================
-        // 🔓 DECRYPT REQUEST
+        // 🔓 Decrypt incoming request
         // ==========================
         var decryptedJson = DecryptFlowRequest(req, rsa, out var aesKey, out var iv);
-
         Console.WriteLine("🔓 Decrypted Payload:");
         Console.WriteLine(decryptedJson);
 
         using var doc = JsonDocument.Parse(decryptedJson);
         var root = doc.RootElement;
 
-        // Detect action safely
-        string? action = null;
-        if (root.TryGetProperty("action", out var actionProp))
-        {
-            action = actionProp.GetString();
-        }
+        var version = root.GetProperty("version").GetString();
+        var action = root.TryGetProperty("action", out var a) ? a.GetString() : "ping";
+
+        // flow_token is optional (ping does not send it)
+        string? flowToken = null;
+        if (root.TryGetProperty("flow_token", out var ft))
+            flowToken = ft.GetString();
 
         object response;
 
         // ==========================
-        // 🟢 HEALTH CHECK
+        // 🟢 HEALTH CHECK (PING)
         // ==========================
-        if (action == null)
+        if (action == "ping")
         {
             response = new
             {
                 version = "3.0",
-                response = new
-                {
-                    screen = "INIT",
-                    data = new { }
-                }
+                screen = "screen_asnlyt",
+                data = new { }
             };
 
-            Console.WriteLine("🟢 Health check response selected");
+            Console.WriteLine("🟢 Health check (ping) handled");
         }
 
         // ==========================
-        // 🟢 DATA EXCHANGE (Dropdown)
+        // 🟢 INIT (Flow Launch)
         // ==========================
-        else if (action == "DATA_EXCHANGE")
+        else if (action == "INIT")
+        {
+            response = new
+            {
+                version = "3.0",
+                screen = "screen_asnlyt",
+                data = new { }
+            };
+
+            Console.WriteLine("🟢 INIT handled");
+        }
+
+        // ==========================
+        // 🟢 DATA EXCHANGE (Dropdown fetch)
+        // ==========================
+        else if (action == "data_exchange")
         {
             var client = httpClientFactory.CreateClient();
             var apiResponse = await client.GetAsync(
@@ -128,33 +139,70 @@ namespace WhatsAppFlowApi
                 }
             };
 
-            Console.WriteLine("🟢 DATA_EXCHANGE response selected");
+            Console.WriteLine("🟢 data_exchange handled");
         }
 
         // ==========================
-        // 🟢 SUBMIT (Optional)
+        // 🟢 BACK BUTTON
+        // ==========================
+        else if (action == "BACK")
+        {
+            response = new
+            {
+                version = "3.0",
+                screen = "screen_asnlyt",
+                data = new { }
+            };
+
+            Console.WriteLine("🟢 BACK handled");
+        }
+
+        // ==========================
+        // 🟢 SUBMIT (Final screen)
         // ==========================
         else if (action == "SUBMIT")
         {
+            if (string.IsNullOrEmpty(flowToken))
+                throw new Exception("flow_token missing on SUBMIT");
+
             response = new
             {
                 version = "3.0",
                 screen = "SUCCESS",
                 data = new
                 {
-                    message = "Order received successfully"
+                    extension_message_response = new
+                    {
+                        @params = new
+                        {
+                            flow_token = flowToken
+                        }
+                    }
                 }
             };
 
-            Console.WriteLine("🟢 SUBMIT response selected");
+            Console.WriteLine("🟢 SUBMIT handled");
         }
+
+        // ==========================
+        // 🔴 UNKNOWN ACTION
+        // ==========================
         else
         {
             throw new Exception($"Unknown action: {action}");
         }
 
         // ==========================
-        // 🔐 ENCRYPT RESPONSE
+        // 🔍 LOG RESPONSE (PLAINTEXT)
+        // ==========================
+        Console.WriteLine("📦 FLOW RESPONSE (before encryption):");
+        Console.WriteLine(JsonSerializer.Serialize(response, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        }));
+
+        // ==========================
+        // 🔐 Encrypt & return
         // ==========================
         var encrypted = EncryptFlowResponse(response, aesKey, iv);
 
@@ -168,7 +216,6 @@ namespace WhatsAppFlowApi
         return Results.StatusCode(500);
     }
 });
-
 
 
 
