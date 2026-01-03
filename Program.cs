@@ -74,26 +74,24 @@ namespace WhatsAppFlowApi
         // ==================================================
         // ✅ 1. HEALTH CHECK (PING) — MUST RETURN MINIMAL JSON
         // ==================================================
-        if (action == "ping")
-        {
-            Console.WriteLine("🟢 Health check (ping) handled");
 
-            var pingResponse = new
-            {
-                version = version,
-                data = new { }
-            };
+            if (action == "ping")
+{
+    Console.WriteLine("🟢 Health check (ping) handled");
 
-            Console.WriteLine("📦 PING RESPONSE (before encryption):");
-            Console.WriteLine(JsonSerializer.Serialize(pingResponse, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            }));
+    var pingResponse = new
+    {
+        version = version,
+        data = new { }
+    };
 
-            var encryptedPing = EncryptFlowResponse(pingResponse, aesKey, iv);
+    Console.WriteLine("📦 PING RESPONSE (PLAIN JSON):");
+    Console.WriteLine(JsonSerializer.Serialize(pingResponse));
 
-            return Results.Text(encryptedPing, "application/json");
-        }
+    // 🚨 IMPORTANT: DO NOT ENCRYPT
+    return Results.Json(pingResponse);
+}
+
 
         // ==================================================
         // ✅ 2. NORMAL FLOW LOGIC (UNCHANGED)
