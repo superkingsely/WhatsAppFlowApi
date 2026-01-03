@@ -85,13 +85,19 @@ namespace WhatsAppFlowApi
         data = new { }
     };
 
-    Console.WriteLine("📦 PING RESPONSE (PLAIN JSON):");
-    Console.WriteLine(JsonSerializer.Serialize(pingResponse));
+    Console.WriteLine("📦 PING RESPONSE (before encryption):");
+    Console.WriteLine(JsonSerializer.Serialize(pingResponse, new JsonSerializerOptions
+    {
+        WriteIndented = true
+    }));
 
-    // 🚨 IMPORTANT: DO NOT ENCRYPT
-    return Results.Json(pingResponse);
+    // ✅ MUST BE ENCRYPTED & BASE64
+    var encryptedPing = EncryptFlowResponse(pingResponse, aesKey, iv);
+
+    return Results.Text(encryptedPing, "application/json");
 }
 
+        
 
         // ==================================================
         // ✅ 2. NORMAL FLOW LOGIC (UNCHANGED)
