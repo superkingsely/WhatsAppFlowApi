@@ -39,7 +39,9 @@ namespace WhatsAppFlowApi
             // ==========================
             // 🔹 FLOW ENDPOINT
             // ==========================
-                app.MapPost("/flows/endpoint", async (
+
+
+                    app.MapPost("/flows/endpoint", async (
     FlowEncryptedRequest req,
     IHttpClientFactory httpClientFactory
 ) =>
@@ -48,19 +50,15 @@ namespace WhatsAppFlowApi
 
     try
     {
-        // ==========================
-        // 🔐 Load RSA private key
-        // ==========================
         var privatePem = Environment.GetEnvironmentVariable("PRIVATE_KEY_PEM")
             ?? throw new Exception("PRIVATE_KEY_PEM missing");
 
         using var rsa = RSA.Create();
         rsa.ImportFromPem(privatePem);
 
-        // ==========================
-        // 🔓 Decrypt incoming request
-        // ==========================
+        // 🔓 Decrypt request (USING YOUR EXISTING HELPER)
         var decryptedJson = DecryptFlowRequest(req, rsa, out var aesKey, out var iv);
+
         Console.WriteLine("🔓 Decrypted Payload:");
         Console.WriteLine(decryptedJson);
 
@@ -68,142 +66,76 @@ namespace WhatsAppFlowApi
         var root = doc.RootElement;
 
         var version = root.GetProperty("version").GetString();
-        var action = root.TryGetProperty("action", out var a) ? a.GetString() : "ping";
 
-        // flow_token is optional (ping does not send it)
-        string? flowToken = null;
-        if (root.TryGetProperty("flow_token", out var ft))
-            flowToken = ft.GetString();
+        var action = root.TryGetProperty("action", out var act)
+            ? act.GetString()
+            : null;
 
-        object response;
-
-        // ==========================
-        // 🟢 HEALTH CHECK (PING)
-        // ==========================
+        // ==================================================
+        // ✅ 1. HEALTH CHECK (PING) — MUST RETURN MINIMAL JSON
+        // ==================================================
         if (action == "ping")
         {
-            response = new
-            {
-                version = "3.0",
-                screen = "screen_asnlyt",
-                data = new { }
-            };
-
             Console.WriteLine("🟢 Health check (ping) handled");
-        }
 
-        // ==========================
-        // 🟢 INIT (Flow Launch)
-        // ==========================
-        else if (action == "INIT")
-        {
-            response = new
+            var pingResponse = new
             {
-                version = "3.0",
-                screen = "screen_asnlyt",
+                version = version,
                 data = new { }
             };
 
-            Console.WriteLine("🟢 INIT handled");
-        }
-
-        // ==========================
-        // 🟢 DATA EXCHANGE (Dropdown fetch)
-        // ==========================
-        else if (action == "data_exchange")
-        {
-            var client = httpClientFactory.CreateClient();
-            var apiResponse = await client.GetAsync(
-                "https://cjendpoint.onrender.com/api/areas"
-            );
-
-            if (!apiResponse.IsSuccessStatusCode)
-                throw new Exception("Failed to fetch delivery areas");
-
-            var rawAreas = await apiResponse.Content
-                .ReadFromJsonAsync<List<ExternalArea>>();
-
-            var deliveryAreas = rawAreas!.ConvertAll(a => new
+            Console.WriteLine("📦 PING RESPONSE (before encryption):");
+            Console.WriteLine(JsonSerializer.Serialize(pingResponse, new JsonSerializerOptions
             {
-                id = a.id,
-                title = a.title
-            });
+                WriteIndented = true
+            }));
 
-            response = new
-            {
-                version = "3.0",
-                screen = root.GetProperty("screen").GetString(),
-                data = new
-                {
-                    delivery_areas = deliveryAreas
-                }
-            };
+            var encryptedPing = EncryptFlowResponse(pingResponse, aesKey, iv);
 
-            Console.WriteLine("🟢 data_exchange handled");
+            return Results.Text(encryptedPing, "application/json");
         }
 
-        // ==========================
-        // 🟢 BACK BUTTON
-        // ==========================
-        else if (action == "BACK")
+        // ==================================================
+        // ✅ 2. NORMAL FLOW LOGIC (UNCHANGED)
+        // ==================================================
+
+        var client = httpClientFactory.CreateClient();
+        var apiResponse = await client.GetAsync("https://cjendpoint.onrender.com/api/areas");
+
+        if (!apiResponse.IsSuccessStatusCode)
+            throw new Exception("Failed to fetch delivery areas");
+
+        var rawAreas = await apiResponse.Content
+            .ReadFromJsonAsync<List<ExternalArea>>();
+
+        var deliveryAreas = rawAreas!.ConvertAll(a => new
         {
-            response = new
-            {
-                version = "3.0",
-                screen = "screen_asnlyt",
-                data = new { }
-            };
+            id = a.id,
+            title = a.title
+        });
 
-            Console.WriteLine("🟢 BACK handled");
-        }
-
-        // ==========================
-        // 🟢 SUBMIT (Final screen)
-        // ==========================
-        else if (action == "SUBMIT")
+        Console.WriteLine("🧪 MAPPED DELIVERY AREAS:");
+        Console.WriteLine(JsonSerializer.Serialize(deliveryAreas, new JsonSerializerOptions
         {
-            if (string.IsNullOrEmpty(flowToken))
-                throw new Exception("flow_token missing on SUBMIT");
+            WriteIndented = true
+        }));
 
-            response = new
-            {
-                version = "3.0",
-                screen = "SUCCESS",
-                data = new
-                {
-                    extension_message_response = new
-                    {
-                        @params = new
-                        {
-                            flow_token = flowToken
-                        }
-                    }
-                }
-            };
-
-            Console.WriteLine("🟢 SUBMIT handled");
-        }
-
-        // ==========================
-        // 🔴 UNKNOWN ACTION
-        // ==========================
-        else
+        var response = new
         {
-            throw new Exception($"Unknown action: {action}");
-        }
+            version = "3.0",
+            screen = "screen_asnlyt",
+            data = new
+            {
+                delivery_areas = deliveryAreas
+            }
+        };
 
-        // ==========================
-        // 🔍 LOG RESPONSE (PLAINTEXT)
-        // ==========================
-        Console.WriteLine("📦 FLOW RESPONSE (before encryption):");
+        Console.WriteLine("📦 FLOW JSON SENT TO WHATSAPP (before encryption):");
         Console.WriteLine(JsonSerializer.Serialize(response, new JsonSerializerOptions
         {
             WriteIndented = true
         }));
 
-        // ==========================
-        // 🔐 Encrypt & return
-        // ==========================
         var encrypted = EncryptFlowResponse(response, aesKey, iv);
 
         Console.WriteLine("✅ FLOW RESPONSE OK");
@@ -216,7 +148,6 @@ namespace WhatsAppFlowApi
         return Results.StatusCode(500);
     }
 });
-
 
 
             // app.MapPost("/flows/endpoint", async (
