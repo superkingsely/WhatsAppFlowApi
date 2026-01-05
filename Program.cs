@@ -95,7 +95,7 @@ namespace WhatsAppFlowApi
         else if (action == "INIT")
         {
             var client = httpClientFactory.CreateClient();
-            var apiResponse = await client.GetAsync($"https://api.food-ease.io/api/v1/OrderCharge/whatsapp-list-charges?restaurantId=d91e02ba-50f3-4cd6-8607-8ffbbeeda2da&revCenterId=f97e82e5-c922-4f9c-bc9a-477641d72d11&serviceType=Delivery");
+            var apiResponse = await client.GetAsync("https://api.food-ease.io/api/v1/OrderCharge/whatsapp-list-charges?restaurantId=d91e02ba-50f3-4cd6-8607-8ffbbeeda2da&revCenterId=f97e82e5-c922-4f9c-bc9a-477641d72d11&sourceId=e059a93c-5423-4d07-a7df-8e48b38c428b&serviceType=Delivery&api-version=v1");
 
             if (!apiResponse.IsSuccessStatusCode)
                 throw new Exception("Failed to fetch delivery areas");
