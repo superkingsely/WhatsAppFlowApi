@@ -2,6 +2,7 @@
 
 using System;
 using System.Text;
+using System.Linq;
 using System.Text.Json;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -92,33 +93,83 @@ namespace WhatsAppFlowApi
         // ==================================================
         // ✅ INIT (FIRST SCREEN)
         // ==================================================
-        else if (action == "INIT")
+
+
+else if (action == "INIT")
+{
+    var client = httpClientFactory.CreateClient();
+
+    var apiResponse = await client.GetAsync(
+        "https://api.food-ease.io/api/v1/OrderCharge/whatsapp-list-charges?restaurantId=d91e02ba-50f3-4cd6-8607-8ffbbeeda2da&revCenterId=f97e82e5-c922-4f9c-bc9a-477641d72d11&sourceId=e059a93c-5423-4d07-a7df-8e48b38c428b&serviceType=Delivery&api-version=v1"
+    );
+
+    if (!apiResponse.IsSuccessStatusCode)
+        throw new Exception("Failed to fetch delivery areas");
+
+    var rawApiResponse =
+        await apiResponse.Content.ReadFromJsonAsync<ExternalApiResponse>();
+
+    var deliveryAreas = rawApiResponse!.data.data
+        .Where(x => x.chargeServices != null && x.chargeServices.Count > 0)
+        .Select(x => new
         {
-            var client = httpClientFactory.CreateClient();
-            var apiResponse = await client.GetAsync("https://api.food-ease.io/api/v1/OrderCharge/whatsapp-list-charges?restaurantId=d91e02ba-50f3-4cd6-8607-8ffbbeeda2da&revCenterId=f97e82e5-c922-4f9c-bc9a-477641d72d11&sourceId=e059a93c-5423-4d07-a7df-8e48b38c428b&serviceType=Delivery&api-version=v1");
+            id = x.id,
+            title = x.chargeServices[0].orderCharge
+        })
+        .ToList();
 
-            if (!apiResponse.IsSuccessStatusCode)
-                throw new Exception("Failed to fetch delivery areas");
-
-            var rawAreas = await apiResponse.Content.ReadFromJsonAsync<List<ExternalArea>>();
-
-            var deliveryAreas = rawAreas!.ConvertAll(a => new
-            {
-                id = a.id,
-                title = a.title
-            });
-
-            response = new
-            {
-                version = "3.0",
-                screen = "screen_asnlyt",
-                data = new
-                {
-                    delivery_areas = deliveryAreas,
-                    status = "active"
-                }
-            };
+    response = new
+    {
+        version = "3.0",
+        screen = "screen_asnlyt",
+        data = new
+        {
+            delivery_areas = deliveryAreas,
+            status = "active"
         }
+    };
+}
+
+
+//         else if (action == "INIT")
+//         {
+//             var client = httpClientFactory.CreateClient();
+//             var apiResponse = await client.GetAsync("https://api.food-ease.io/api/v1/OrderCharge/whatsapp-list-charges?restaurantId=d91e02ba-50f3-4cd6-8607-8ffbbeeda2da&revCenterId=f97e82e5-c922-4f9c-bc9a-477641d72d11&sourceId=e059a93c-5423-4d07-a7df-8e48b38c428b&serviceType=Delivery&api-version=v1");
+
+//            // 1. Deserialize
+// var rootObj = await apiResponse.Content.ReadFromJsonAsync<ApiResponseRoot>();
+
+// // 2. Map the data safely
+// var deliveryAreas = (rootObj?.data?.data != null) 
+//     ? rootObj.data.data.Select(item => new
+//         {
+//             id = item.id,
+//             title = item.chargeServices?.FirstOrDefault()?.orderCharge ?? item.name
+//         }).ToList()
+//     : new List<dynamic>(); // Use dynamic to satisfy the compiler's type checking
+
+
+//             // var deliveryAreas = rawAreas!.ConvertAll(a => new
+//             // {
+//             //     id = a.id,
+//             //     title = a.title
+//             // });
+
+//             response = new
+//             {
+//                 version = "3.0",
+//                 screen = "screen_asnlyt",
+//                 data = new
+//                 {
+//                     delivery_areas = deliveryAreas,
+//                     status = "active"
+//                 }
+//             };
+//         }
+
+
+
+
 
         // ==================================================
         // ✅ NAVIGATE (MIRROR PAYLOAD → NEXT SCREEN)
@@ -297,6 +348,30 @@ namespace WhatsAppFlowApi
         // ==========================
         // 🔹 DTOs
         // ==========================
+
+            public class ExternalApiResponse
+{
+    public DataContainer data { get; set; }=new();
+}
+
+public class DataContainer
+{
+    public List<ChargeItem> data { get; set; }=new();
+}
+
+public class ChargeItem
+{
+    public string id { get; set; } = "";
+    public string title { get; set; } = "";
+    public List<ChargeService> chargeServices { get; set; }=new();
+}
+
+public class ChargeService
+{
+    public string orderCharge { get; set; }="";
+}
+
+
         public sealed record FlowEncryptedRequest(
             string encrypted_flow_data,
             string encrypted_aes_key,
