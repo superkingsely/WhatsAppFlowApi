@@ -113,7 +113,8 @@ else if (action == "INIT")
         .Where(x => x.chargeServices != null && x.chargeServices.Count > 0)
         .Select(x => new
         {
-            id = x.id,
+            // id = x.id,
+            id = x.chargeServices[0].orderCharge,
             title = x.chargeServices[0].orderCharge
         })
         .ToList();
